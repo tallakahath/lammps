@@ -34,7 +34,7 @@ ComputeSNAVAtom::ComputeSNAVAtom(LAMMPS *lmp, int narg, char **arg) :
   radelem(NULL), wjelem(NULL)
 {
   double rfac0, rmin0;
-  int twojmax, switchflag, bzeroflag;
+  int twojmax, switchflag, bzeroflag, mode;
   radelem = NULL;
   wjelem = NULL;
 
@@ -51,6 +51,7 @@ ComputeSNAVAtom::ComputeSNAVAtom(LAMMPS *lmp, int narg, char **arg) :
   rmin0 = 0.0;
   switchflag = 1;
   bzeroflag = 0;
+  mode = 0;
 
   // process required arguments
   memory->create(radelem,ntypes+1,"sna/atom:radelem"); // offset by 1 to match up with types
@@ -96,19 +97,31 @@ ComputeSNAVAtom::ComputeSNAVAtom(LAMMPS *lmp, int narg, char **arg) :
 	error->all(FLERR,"Illegal compute snav/atom command");
       switchflag = atoi(arg[iarg+1]);
       iarg += 2;
+    } else if (strcmp(arg[iarg],"bzeroflag") == 0) {
+      if (iarg+2 > narg)
+	error->all(FLERR,"Illegal compute sna/atom command");
+      bzeroflag = atoi(arg[iarg+1]);
+      iarg += 2;
+    } else if (strcmp(arg[iarg],"mode") == 0) {
+      if (iarg+2 > narg)
+	error->all(FLERR,"Illegal compute sna/atom command");
+      mode = atoi(arg[iarg+1]);
+      if (mode < 0 || mode > 1)
+	error->all(FLERR,"Illegal compute sna/atom command");
+      iarg += 2;
     } else error->all(FLERR,"Illegal compute snav/atom command");
   }
 
   snaptr = new SNA*[comm->nthreads];
 #if defined(_OPENMP)
-#pragma omp parallel default(none) shared(lmp,rfac0,twojmax,rmin0,switchflag,bzeroflag)
+#pragma omp parallel default(none) shared(lmp,rfac0,twojmax,rmin0,switchflag,bzeroflag,mode)
 #endif
   {
     int tid = omp_get_thread_num();
 
     // always unset use_shared_arrays since it does not work with computes
     snaptr[tid] = new SNA(lmp,rfac0,twojmax,diagonalstyle,
-                          0 /*use_shared_arrays*/, rmin0,switchflag,bzeroflag);
+                          0 /*use_shared_arrays*/, rmin0,switchflag,bzeroflag,mode);
   }
 
   ncoeff = snaptr[0]->ncoeff;
@@ -236,6 +249,13 @@ void ComputeSNAVAtom::compute_peratom()
       // insure rij, inside, and typej  are of size jnum
 
 	  snaptr[tid]->grow_rij(jnum);
+
+      // set central atom info
+      if (wjelem[itype] > 0) {
+	    snaptr[tid]->wself = 1.0;
+      } else {
+	    snaptr[tid]->wself = -1.0;
+      }
 
       // rij[][3] = displacements between atom I and those neighbors
       // inside = indices of neighbors of I within cutoff

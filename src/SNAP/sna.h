@@ -31,7 +31,7 @@ struct SNA_LOOPINDICES {
 class SNA : protected Pointers {
 
 public:
-  SNA(LAMMPS*, double, int, int, int, double, int, int);
+  SNA(LAMMPS*, double, int, int, int, double, int, int, int);
 
   SNA(LAMMPS* lmp) : Pointers(lmp) {};
   ~SNA();
@@ -39,7 +39,13 @@ public:
   void init();
   double memory_usage();
 
+  // Self-weight
+  double wself;
+
   int ncoeff;
+
+  // Whether type A or B multi-den SNAP
+  int mode;
 
   // functions for bispectrum coefficients
 
@@ -135,9 +141,6 @@ private:
   // 0 = none
   // 1 = cosine
   int switch_flag;
-
-  // Self-weight
-  double wself;
 
   int bzero_flag; // 1 if bzero subtracted from barray
   double *bzero;  // array of B values for isolated atoms

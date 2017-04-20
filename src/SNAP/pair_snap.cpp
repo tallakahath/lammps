@@ -200,6 +200,12 @@ void PairSNAP::compute_regular(int eflag, int vflag)
 
     snaptr->grow_rij(jnum);
 
+    // set central atom info
+    if (wjelem[ielem] > 0) {
+	  snaptr->wself = 1.0;
+    } else {
+	  snaptr->wself = -1.0;
+    }
     // rij[][3] = displacements between atom I and those neighbors
     // inside = indices of neighbors of I within cutoff
     // wj = weights for neighbors of I within cutoff
@@ -507,6 +513,12 @@ void PairSNAP::compute_optimized(int eflag, int vflag)
 
           sna[tid]->grow_rij(jnum);
 
+          // set central atom info
+          if (wjelem[ielem] > 0) {
+            snaptr->wself = 1.0;
+          } else {
+            snaptr->wself = -1.0;
+          }
           // rij[][3] = displacements between atom I and those neighbors
           // inside = indices of neighbors of I within cutoff
           // wj = weights of neighbors of I within cutoff

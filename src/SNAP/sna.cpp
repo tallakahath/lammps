@@ -115,7 +115,7 @@ using namespace MathConst;
 
 SNA::SNA(LAMMPS* lmp, double rfac0_in,
          int twojmax_in, int diagonalstyle_in, int use_shared_arrays_in,
-         double rmin0_in, int switch_flag_in, int bzero_flag_in) : Pointers(lmp)
+         double rmin0_in, int switch_flag_in, int bzero_flag_in, int mode_in) : Pointers(lmp)
 {
   wself = 1.0;
   
@@ -124,6 +124,7 @@ SNA::SNA(LAMMPS* lmp, double rfac0_in,
   rmin0 = rmin0_in;
   switch_flag = switch_flag_in;
   bzero_flag = bzero_flag_in;
+  mode = mode_in;
 
   twojmax = twojmax_in;
   diagonalstyle = diagonalstyle_in;
@@ -318,7 +319,14 @@ void SNA::compute_ui(int jnum)
   //   utot(j,ma,mb) += u(r0;j,ma,mb) for all j,ma,mb
 
   zero_uarraytot();
+
+  // If mode 0, wself = sign(wi)
+  if (mode == 0) {
   addself_uarraytot(wself);
+  // If mode 1, wself = sign(wi**2) == 1
+  } else {
+  addself_uarraytot(wself*wself);
+  }
 
 #ifdef TIMING_INFO
   clock_gettime(CLOCK_REALTIME, &starttime);
@@ -336,7 +344,13 @@ void SNA::compute_ui(int jnum)
     z0 = r / tan(theta0);
 
     compute_uarray(x, y, z, z0, r);
-    add_uarraytot(r, wj[j], rcutij[j]);
+    // If mode 0, wij = wj
+    if (mode == 0) {
+      add_uarraytot(r, wj[j], rcutij[j]);
+    // If mode 1, wij = wj*sign(wi)
+    } else {
+      add_uarraytot(r, wself*wj[j], rcutij[j]);
+    }
   }
 
 #ifdef TIMING_INFO
@@ -358,7 +372,14 @@ void SNA::compute_ui_omp(int jnum, int sub_threads)
   //   utot(j,ma,mb) += u(r0;j,ma,mb) for all j,ma,mb
 
   zero_uarraytot();
+
+  // If mode 0, wself = sign(wi)
+  if (mode == 0) {
   addself_uarraytot(wself);
+  // If mode 1, wself = sign(wi**2) == 1
+  } else {
+  addself_uarraytot(wself*wself);
+  }
 
   for(int j = 0; j < jnum; j++) {
     x = rij[j][0];
@@ -377,7 +398,13 @@ void SNA::compute_ui_omp(int jnum, int sub_threads)
     {
       compute_uarray_omp(x, y, z, z0, r, sub_threads);
     }
-    add_uarraytot(r, wj[j], rcutij[j]);
+    // If mode 0, wij = wj
+    if (mode == 0) {
+      add_uarraytot(r, wj[j], rcutij[j]);
+    // If mode 1, wij = wj*sign(wi)
+    } else {
+      add_uarraytot(r, wself*wj[j], rcutij[j]);
+    }
   }
 
 
@@ -568,8 +595,15 @@ void SNA::compute_bi()
 	}
 
         barray[j1][j2][j] *= 2.0;
-	if (bzero_flag)
-	  barray[j1][j2][j] -= bzero[j];
+	if (bzero_flag){
+      if (mode == 0) {
+        // If mode 0, wself**3 = sign(wi**3) = sign(wi)
+	    barray[j1][j2][j] -= wself*bzero[j];
+      } else {
+        // If mode 1, wself**3 = sign((wi**2)**3) == 1
+	    barray[j1][j2][j] -= bzero[j];
+        }
+    }
       }
     }
 
@@ -646,7 +680,13 @@ void SNA::compute_duidrj(double* rij, double wj, double rcut)
   clock_gettime(CLOCK_REALTIME, &starttime);
 #endif
 
-  compute_duarray(x, y, z, z0, r, dz0dr, wj, rcut);
+  // If mode 0, wij = wj
+  if (mode == 0) {
+    compute_duarray(x, y, z, z0, r, dz0dr, wj, rcut);
+  // If mode 1, wij = wj*sign(wi)
+  } else {
+    compute_duarray(x, y, z, z0, r, dz0dr, wj*wself, rcut);
+  }
 
 #ifdef TIMING_INFO
   clock_gettime(CLOCK_REALTIME, &endtime);
